@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MockAR 認識テスト</title><link rel="stylesheet" href="style.css"></head>
+<body><main><h1>MockAR <small>認識テスト</small></h1>
+<p>A → C → F → 時計回り90°</p>
+<div class="controls"><button id="start">背面カメラ開始</button><button id="stop" disabled>停止</button><button id="reset">履歴リセット</button></div>
+<p id="message" role="status">PCと同じWi-Fiで接続してください。</p>
+<video id="video" playsinline muted hidden></video><canvas id="preview"></canvas>
+<section class="demo"><label><input id="show-object" type="checkbox" checked> 重ねて表示</label>
+<label><input id="puzzle-on" type="checkbox" checked> 謎モード（Eをスワイプで開く → 中のスイッチ → 1・2・3を順に上へ）</label>
+<label>表示 <select id="object-mode"><option value="color">面ごとに色分け</option><option value="black">箱全体を黒く</option><option value="box">別の青い箱</option><option value="ball">色つきの球（前のデモ）</option></select></label>
+<p id="object-state">箱のマーカーを映してください。</p>
+<p id="pose-state">位置推定: 待機中</p>
+<p>タップ=その面の数字+1 / 長押し=色を変える / Eの面は矢印の向きにスワイプで開く → <b id="touched">—</b></p>
+<p>上になっている面: <b id="up-face">—</b> / 手順: <b id="puzzle-state">Eのスイッチを押す</b></p>
+<p>スマホは固定してください。画面の上方向を「上」として判定します。</p>
+<label>不透明度 <input id="box-opacity" type="range" min="0.2" max="1" step="0.05" value="1"></label>
+<details><summary>1面だけのときの位置合わせ</summary><label>カメラ画角 <input id="camera-fov" type="range" min="35" max="100" value="60"> <output id="fov-value">60°</output></label><p>一度2面以上を映すと画角を自動で測り、このスライダーは使われなくなります（再読み込みでリセット）。1面だけのときは直前の箱の向きも使って傾きを判断するので、2面以上見える状態から回していくと安定します。</p></details>
+<p>Unityの <b>Oblique view</b> で上面・側面も映せます。<b>Front view</b> で正面に戻ります。</p></section>
+<section aria-live="polite"><dl>
+<dt>認識状態</dt><dd id="state">未認識</dd><dt>現在の面</dt><dd id="face">—</dd>
+<dt>直前の確定面</dt><dd id="confirmed">—</dd><dt>回転角（時計回り）</dt><dd id="angle">—</dd>
+<dt>安定認識時間</dt><dd id="stable">0 ms</dd><dt>Fからの回転</dt><dd id="turn">—</dd>
+<dt>判定結果</dt><dd id="result">未完成 0 / 4</dd><dt>処理速度</dt><dd id="fps">—</dd>
+</dl><p id="history">入力履歴: —</p></section>
+<details><summary>試験記録</summary><p>距離・角度・画面サイズなどの条件と結果を記入して保存できます。</p>
+<textarea id="notes" rows="4" placeholder="50cm / 正面 / 500px / 明るさ80% / 10回中8回成功"></textarea>
+<button id="export">記録をJSONで保存</button></details>
+<p><a href="markers.html">6面のマーカーを確認</a> / <a href="print.html">キューブの展開図（印刷用）</a></p>
+<p class="credit">認識ライブラリ: <a href="https://github.com/jcmellado/js-aruco">js-aruco</a>（MIT） / スイッチの3Dモデル: Button Switch by Zoe XR</p>
+</main><script src="vendor/cv.js"></script><script src="vendor/aruco.js"></script><script src="tracker.js"></script><script src="box.js"></script><script src="switch.js"></script><script src="app.js"></script></body></html>

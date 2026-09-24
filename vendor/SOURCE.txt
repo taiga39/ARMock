@@ -1,0 +1,10 @@
+js-aruco by Juan Mellado, MIT license (LICENSE.txt).
+Downloaded 2026-09-22 from:
+https://raw.githubusercontent.com/jcmellado/js-aruco/master/src/aruco.js
+https://raw.githubusercontent.com/jcmellado/js-aruco/master/src/cv.js
+https://raw.githubusercontent.com/jcmellado/js-aruco/master/LICENSE.txt
+
+Vendored unchanged; no runtime CDN requests.
+SHA256:
+aruco.js 6410557E6D303F57EF020C3C225C56956FFCBA707FB21C0514DC8BF965EF6D20
+cv.js    3A67AB47F509C88A6325014A58D6F1A99F45D373292F20C0E05A2345CF8449B4
