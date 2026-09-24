@@ -191,7 +191,11 @@ const canvasPoint = event => {
     y: (event.clientY - rect.top) * canvas.height / rect.height };
 };
 function say(text, color) { $('touched').textContent = text; $('touched').style.color = color; }
+// The browser's own gestures would take the finger away: scrolling on a swipe, and the selection
+// callout on a long press. The canvas handles all of them itself.
+canvas.addEventListener('contextmenu', event => event.preventDefault());
 canvas.addEventListener('pointerdown', event => {
+  event.preventDefault();
   if (!lastPose) return;
   const { x, y } = canvasPoint(event);
   // The switch inside the box is offered the tap before the faces around it.
@@ -218,6 +222,7 @@ canvas.addEventListener('pointerdown', event => {
 });
 canvas.addEventListener('pointermove', event => {
   if (!gesture) return;
+  event.preventDefault();
   const { x, y } = canvasPoint(event), dx = x - gesture.x, dy = y - gesture.y;
   if (!gesture.moved && Math.hypot(dx, dy) < MOVE_PX) return;
   gesture.moved = true; clearTimeout(gesture.timer);
