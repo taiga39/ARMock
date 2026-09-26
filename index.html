@@ -7,7 +7,7 @@
 <p id="message" role="status">PCと同じWi-Fiで接続してください。</p>
 <video id="video" playsinline muted hidden></video><canvas id="preview"></canvas>
 <section class="demo"><label><input id="show-object" type="checkbox" checked> 重ねて表示</label>
-<label><input id="puzzle-on" type="checkbox" checked> 謎モード（Eをスワイプで開く → 中のスイッチ → 1・2・3を順に上へ）</label>
+<label><input id="puzzle-on" type="checkbox" checked> 謎モード（Eをスワイプで開く → 中のスイッチ → 箱を回して文字をそろえる）</label>
 <label>表示 <select id="object-mode"><option value="color">面ごとに色分け</option><option value="black">箱全体を黒く</option><option value="box">別の青い箱</option><option value="ball">色つきの球（前のデモ）</option></select></label>
 <p id="object-state">箱のマーカーを映してください。</p>
 <p id="pose-state">位置推定: 待機中</p>
@@ -27,5 +27,5 @@
 <textarea id="notes" rows="4" placeholder="50cm / 正面 / 500px / 明るさ80% / 10回中8回成功"></textarea>
 <button id="export">記録をJSONで保存</button></details>
 <p><a href="markers.html">6面のマーカーを確認</a> / <a href="print.html">キューブの展開図（印刷用）</a></p>
-<p class="credit">認識ライブラリ: <a href="https://github.com/jcmellado/js-aruco">js-aruco</a>（MIT） / スイッチの3Dモデル: Button Switch by Zoe XR</p>
-</main><script src="vendor/cv.js"></script><script src="vendor/aruco.js"></script><script src="tracker.js"></script><script src="box.js"></script><script src="switch.js"></script><script src="app.js"></script></body></html>
+<p class="credit">認識ライブラリ: <a href="https://github.com/jcmellado/js-aruco">js-aruco</a>（MIT） / スイッチの3Dモデル: Button Switch by Zoe XR / 浮かぶ文字: anamorphic_QR</p>
+</main><script src="vendor/cv.js"></script><script src="vendor/aruco.js"></script><script src="tracker.js"></script><script src="box.js"></script><script src="switch.js"></script><script src="anamorphic.js"></script><script src="app.js"></script></body></html>

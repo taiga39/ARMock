@@ -18,16 +18,17 @@ const counts = [0, 0, 0, 0, 0, 0], faceColorOverride = {};
 const PALETTE = [...MockARBox.faceColors, '#e8b23a', '#e9eef7', '#2b3648'];
 const LONG_PRESS_MS = 500, MOVE_PX = 8, SWIPE_SPAN = .45, SWIPE_OPEN = .4;
 let gesture = null, dragging = false;
-// switch -> inside (lid open, second switch) -> numbers (1,2,3 must come up in order) -> solved
-let stage = 'switch', step = 0, upFace = -1, upCandidate = -1, upSince = 0;
+// switch -> inside (lid open, second switch) -> hologram (the anamorphic letters float above)
+let stage = 'switch', upFace = -1, upCandidate = -1, upSince = 0;
 const FACE_E = 4, FACE_FLOOR = 3, FACE_E_ID = MockAR.IDS[FACE_E], HOLD_MS = 300, OPEN_MS = 600, OPEN_ANGLE = Math.PI * .55;
-// Dice positions 1, 4 and 6: two opposite faces (B and D) plus one next to both (C).
-const NUMBER_FACES = [1, 2, 3], NUMBER_LABELS = { 1: '1', 2: '2', 3: '3' }, UP_SCORE = .75, UP_HOLD_MS = 400;
+const UP_SCORE = .75, UP_HOLD_MS = 400;
+// The letters hover half a box above the top face.
+const HOLOGRAM_HEIGHT = 1;
 // The second switch stands on the floor inside the box (the inner side of FACE_D), seen through the opening.
 const insideMesh = MockARBox.placeOnFace(MockARSwitch, FACE_FLOOR, .55, [1], 0, true);
 const insidePressedMesh = MockARBox.placeOnFace(MockARSwitch, FACE_FLOOR, .55, [1], .1, true);
 function resetPuzzle() {
-  stage = 'switch'; step = 0; upFace = -1; upCandidate = -1;
+  stage = 'switch'; upFace = -1; upCandidate = -1;
   openTarget = 0; openProgress = 0; insidePolygons = null;
   counts.fill(0); for (const k of Object.keys(faceColorOverride)) delete faceColorOverride[k];
 }
@@ -38,9 +39,6 @@ function trackUpFace(rotation, now) {
   if (face !== upCandidate) { upCandidate = face; upSince = now; return; }
   if (now - upSince < UP_HOLD_MS || face === upFace) return;
   upFace = face;
-  if (stage !== 'numbers') return;
-  if (face === NUMBER_FACES[step]) { step++; if (step === NUMBER_FACES.length) stage = 'solved'; }
-  else if (NUMBER_FACES.includes(face)) step = face === NUMBER_FACES[0] ? 1 : 0;
 }
 const objectColors = MockARBox.faceColors;
 const colorNames = ['赤', '黄', '青', '緑', '紫', 'オレンジ'];
@@ -132,11 +130,9 @@ function tick(now) {
         openTime = now;
         trackUpFace(pose.rotation, now);
         const style = $('object-mode').value, opacity = Number($('box-opacity').value);
-        const numbers = stage === 'numbers' || stage === 'solved';
         const labels = {};
         for (let k = 0; k < 6; k++) labels[k] = counts[k] ? String(counts[k]) : 'ABCDEF'[k];
-        if (numbers) Object.assign(labels, NUMBER_LABELS);
-        const options = { labels, gold: stage === 'solved', colors: faceColorOverride };
+        const options = { labels, colors: faceColorOverride };
         if (openProgress > .001) {
           options.inside = stage === 'inside' ? (now < insidePressedUntil ? insidePressedMesh : insideMesh) : null;
           insidePolygons = MockARBox.drawOpen(ctx, pose, style, opacity, FACE_E, openProgress * OPEN_ANGLE, options);
@@ -145,16 +141,19 @@ function tick(now) {
         if (lidShown && openProgress < .99)
           MockARBox.drawArrow(ctx, pose, FACE_E, 0, -1, { opacity: (1 - openProgress) * .9,
             transform: MockARBox.openTransform(FACE_E, openProgress * OPEN_ANGLE) });
+        // The letters float above the box and turn with it; only its heading is left to match.
+        if (stage === 'hologram') {
+          const placed = MockARBox.placeAnamorphic(MockARAnamorphic, pose, { height: HOLOGRAM_HEIGHT });
+          if (placed) MockARBox.drawMesh(ctx, pose, placed, 1);
+        }
         lastPose = pose;
         if (touched && now < touched.until) MockARBox.highlight(ctx, pose, touched.face);
         $('pose-state').textContent = pose.mode === 'multi' ? `位置推定: ${pose.count}面で箱全体を追跡（ずれ ${pose.error.toFixed(1)}px）` :
           `位置推定: 1面から推定（${calibratedFocal() ? '画角は自動測定済み' : '画角は手動値'}${pose.mode === 'single-tracked' ? '・直前の向きを使用' : ''}）`;
         if (lidShown) $('pose-state').textContent += openProgress > .001 ? ' / Eの面が開いています' : ' / Eは矢印の向きにスワイプ';
-        $('up-face').textContent = upFace < 0 ? '—' : 'FACE_' + 'ABCDEF'[upFace] +
-          (NUMBER_FACES.includes(upFace) ? `（数字 ${NUMBER_LABELS[upFace]}）` : '');
+        $('up-face').textContent = upFace < 0 ? '—' : 'FACE_' + 'ABCDEF'[upFace];
         $('puzzle-state').textContent = { switch: 'Eの面を矢印の向きにスワイプ', inside: '中のスイッチを押す',
-          numbers: `1→2→3 を順に上へ（${step} / 3）`, solved: 'クリア！全面が金色' }[stage];
-        $('puzzle-state').className = stage === 'solved' ? 'success' : '';
+          hologram: '箱を横に回して、文字がそろう向きを探す' }[stage];
       } else $('pose-state').textContent = '位置推定: 箱の全体をもう少し大きく映してください';
     }
   }
@@ -201,9 +200,9 @@ canvas.addEventListener('pointerdown', event => {
   // The switch inside the box is offered the tap before the faces around it.
   if (MockARBox.hitPolygons(insidePolygons, x, y)) {
     insidePressedUntil = performance.now() + 250;
-    stage = 'numbers'; step = 0; upFace = -1; upCandidate = -1; openTarget = 0;
+    stage = 'hologram'; upFace = -1; upCandidate = -1; openTarget = 0;
     if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
-    say('中のスイッチON（1・2・3 が出ました）', '#ffdb54');
+    say('中のスイッチON（上に何か現れました）', '#ffdb54');
     return;
   }
   const face = MockARBox.hitFace(lastPose, x, y);

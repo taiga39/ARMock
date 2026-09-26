@@ -188,6 +188,38 @@
     ctx.strokeStyle='#00000066';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();
     return true;
   }
+  // Where the camera is, in box coordinates. P = K[R|T]/T2 with K = diag(f,f,1), so the rows give
+  // back T and the focal length, and the camera sits at -R' T. 'up' is the phone's own up direction.
+  function cameraFrame(pose) {
+    const P=pose.matrix,R=pose.rotation; if(!P||!R) return null;
+    const depth=1/Math.hypot(...P[2].slice(0,3)),focal=Math.hypot(...P[0].slice(0,3))*depth;
+    if(!(focal>1e-6)) return null;
+    const T=[P[0][3]*depth/focal,P[1][3]*depth/focal,depth];
+    const center=[0,1,2].map(i=>-(R[0][i]*T[0]+R[1][i]*T[1]+R[2][i]*T[2]));
+    return {center,up:R[1].map(x=>-x),focal,distance:Math.hypot(...center)};
+  }
+  // Floats an anamorphic model above the box. Its shards line up into letters only from the viewpoint
+  // the model was built for, so: the model is scaled to put that viewpoint exactly where the camera is
+  // (distance solved), it is tilted to the camera's height (elevation solved), and its heading follows
+  // the box's own +Z axis. That leaves the player one thing to match: turn the box.
+  function placeAnamorphic(mesh,pose,options={}) {
+    const frame=cameraFrame(pose); if(!frame) return null;
+    const height=options.height??1,designDistance=options.designDistance??3.5;
+    const up=unit(frame.up),pivot=up.map(x=>x*height);
+    const view=frame.center.map((x,i)=>x-pivot[i]),distance=Math.hypot(...view);
+    if(!(distance>1e-3)) return null;
+    // Heading: the box's +Z flattened onto the horizontal plane (any box axis would do).
+    const axis=options.axis||[0,0,1];
+    let heading=axis.map((x,i)=>x-dot(axis,up)*up[i]);
+    if(Math.hypot(...heading)<.15) heading=[0,1,2].map(i=>axis[(i+1)%3]-dot(axis,up)*up[i]);
+    heading=unit(heading);
+    const level=view.map((x,i)=>x-dot(view,up)*up[i]),elevation=Math.atan2(dot(view,up),Math.hypot(...level));
+    const cos=Math.cos(elevation),sin=Math.sin(elevation);
+    const X=unit(cross(heading,up)),Y=heading.map((x,i)=>-x*sin+up[i]*cos),Z=cross(X,Y);
+    const scale=distance/designDistance;
+    return {...mesh,vertices:mesh.vertices.map(([x,y,z])=>
+      [0,1,2].map(i=>pivot[i]+scale*(x*X[i]+y*Y[i]+z*Z[i])))};
+  }
   // Which face points up, assuming the phone is upright and fixed: camera -y is up.
   // score is 1 when the face points exactly up; below ~.5 the box sits on an edge.
   const GOLD='#e8b23a';
@@ -329,6 +361,6 @@
     }
     ctx.restore();
   }
-  const api={estimate,draw,worldCorners,vertices,faces,faceColors,faceMarker,hitFace,highlight,drawMesh,placeOnFace,hitPolygons,drawOpen,openTransform,transformMesh,upFace,faceScreenAxes,drawArrow};
+  const api={estimate,draw,worldCorners,vertices,faces,faceColors,faceMarker,hitFace,highlight,drawMesh,placeOnFace,hitPolygons,drawOpen,openTransform,transformMesh,upFace,faceScreenAxes,drawArrow,cameraFrame,placeAnamorphic};
   if(typeof module!=='undefined')module.exports=api;else root.MockARBox=api;
 })(globalThis);
