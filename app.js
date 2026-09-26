@@ -22,6 +22,11 @@ let gesture = null, dragging = false;
 let stage = 'switch', upFace = -1, upCandidate = -1, upSince = 0;
 const FACE_E = 4, FACE_FLOOR = 3, FACE_E_ID = MockAR.IDS[FACE_E], HOLD_MS = 300, OPEN_MS = 600, OPEN_ANGLE = Math.PI * .55;
 const UP_SCORE = .75, UP_HOLD_MS = 400;
+// QR codes the page knows. The printed one opens this page, and is then looked for in the camera
+// as a marker of its own: seeing it turns the box red.
+const QR_CODES = { 'https://taiga39.github.io/ARMock/': 'ARMockカード' };
+const QR_EVERY = 2, QR_HOLD_MS = 700, QR_RED = '#ff2d2d';
+let qrText = null, qrUntil = 0, qrCorners = null, qrTick = 0;
 // The letters hover half a box above the top face.
 const HOLOGRAM_HEIGHT = 1;
 // The second switch stands on the floor inside the box (the inner side of FACE_D), seen through the opening.
@@ -84,6 +89,9 @@ function render(marker, angle, elapsed) {
   $('object-state').textContent = index < 0 ? '箱のマーカーを映してください。' :
     `${face} → ${$('show-object').checked ? ($('object-mode').value === 'ball' ? colorNames[index]+'の球' : $('object-mode').selectedOptions[0].textContent) : '表示OFF'}`;
   if (elapsed) $('fps').textContent = (1000 / elapsed).toFixed(1) + ' fps';
+  const known = qrText ? QR_CODES[qrText] : null;
+  $('qr-state').textContent = !qrText ? '—' : known ? `${known}（登録済み）` : `未登録: ${qrText.slice(0, 40)}`;
+  $('qr-state').style.color = known ? QR_RED : '#e8edf6';
 }
 function area(m) {
   return Math.abs(m.corners.reduce((sum, p, i, arr) => { const q = arr[(i + 1) % 4]; return sum + p.x * q.y - q.x * p.y; }, 0));
@@ -95,8 +103,16 @@ function tick(now) {
   canvas.width = Math.min(640, video.videoWidth);
   canvas.height = Math.round(canvas.width * video.videoHeight / video.videoWidth);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const markers = detector.detect(ctx.getImageData(0, 0, canvas.width, canvas.height))
+  const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const markers = detector.detect(frame)
     .filter(m => MockAR.IDS.includes(m.id)).sort((a, b) => area(b) - area(a));
+  // Decoding costs a few milliseconds, so it runs on every second processed frame.
+  if (++qrTick % QR_EVERY === 0) {
+    const found = jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' });
+    if (found) { qrText = found.data; qrCorners = found.location; qrUntil = now + QR_HOLD_MS; }
+    else if (now > qrUntil) { qrText = null; qrCorners = null; }
+  } else if (qrText && now > qrUntil) { qrText = null; qrCorners = null; }
+  const qrName = qrText && now <= qrUntil ? QR_CODES[qrText] : null;
   const marker = markers[0];
   let angle = 0;
   if (marker) {
@@ -106,6 +122,13 @@ function tick(now) {
     marker.corners.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
     ctx.closePath(); ctx.stroke();
     ctx.fillStyle = '#ffbd4a'; ctx.beginPath(); ctx.arc(a.x, a.y, 6, 0, Math.PI * 2); ctx.fill();
+  }
+  if (qrCorners) {
+    // Outline the code so it is visible that the page found it, not just decoded it.
+    const corners = [qrCorners.topLeftCorner, qrCorners.topRightCorner, qrCorners.bottomRightCorner, qrCorners.bottomLeftCorner];
+    ctx.strokeStyle = qrName ? QR_RED : '#ffbd4a'; ctx.lineWidth = 3;
+    ctx.beginPath(); corners.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    ctx.closePath(); ctx.stroke();
   }
   tracker.update(marker ? 'FACE_' + String.fromCharCode(65 + MockAR.IDS.indexOf(marker.id)) : null, angle, now);
   $('pose-state').textContent = '位置推定: 未認識';
@@ -132,7 +155,8 @@ function tick(now) {
         const style = $('object-mode').value, opacity = Number($('box-opacity').value);
         const labels = {};
         for (let k = 0; k < 6; k++) labels[k] = counts[k] ? String(counts[k]) : 'ABCDEF'[k];
-        const options = { labels, colors: faceColorOverride };
+        const colors = qrName ? Object.fromEntries([0, 1, 2, 3, 4, 5].map(k => [k, QR_RED])) : faceColorOverride;
+        const options = { labels, colors };
         if (openProgress > .001) {
           options.inside = stage === 'inside' ? (now < insidePressedUntil ? insidePressedMesh : insideMesh) : null;
           insidePolygons = MockARBox.drawOpen(ctx, pose, style, opacity, FACE_E, openProgress * OPEN_ANGLE, options);
