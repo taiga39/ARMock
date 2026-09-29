@@ -242,7 +242,6 @@ function tick(now) {
           const placed = MockARBox.placeAnamorphic(MockARAnamorphic, pose, { height: HOLOGRAM_HEIGHT });
           if (placed) MockARBox.drawMesh(ctx, pose, placed, 1);
         }
-        if (halfTurn && halfTurn.turned) drawWord(ctx, canvas.width, canvas.height, cleared ? 'cleared' : 'waiting');
         lastPose = pose;
         if (touched && now < touched.until) MockARBox.highlight(ctx, pose, touched.face);
         $('pose-state').textContent = pose.mode === 'multi' ? `位置推定: ${pose.count}面で箱全体を追跡（ずれ ${pose.error.toFixed(1)}px）` :
@@ -257,6 +256,9 @@ function tick(now) {
       } else $('pose-state').textContent = '位置推定: 箱の全体をもう少し大きく映してください';
     }
   }
+  // CL and AR belong to the screen, not to the box, so they stay put even on frames where the
+  // box is not recognised - otherwise they flicker while you walk around it.
+  if (halfTurn && halfTurn.turned) drawWord(ctx, canvas.width, canvas.height, cleared ? 'cleared' : 'waiting');
   render(marker, angle, elapsed);
 }
 function stop() {
