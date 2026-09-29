@@ -194,6 +194,12 @@
     const [n,r,u]=bases[k];
     return [0,1,2].map(i=>n[i]*(.5+lift)+a*r[i]+b*u[i]);
   }
+  // Which face is turned toward the camera. score is 1 when it faces the camera square on.
+  function frontFace(rotation) {
+    let face=0,score=-9;
+    bases.forEach(([n],k)=>{const z=rotation[2].reduce((s,x,i)=>s+x*n[i],0);if(-z>score){score=-z;face=k;}});
+    return {face,score};
+  }
   // Where the camera is, in box coordinates. P = K[R|T]/T2 with K = diag(f,f,1), so the rows give
   // back T and the focal length, and the camera sits at -R' T. 'up' is the phone's own up direction.
   function cameraFrame(pose) {
@@ -367,6 +373,6 @@
     }
     ctx.restore();
   }
-  const api={estimate,draw,worldCorners,vertices,faces,faceColors,faceMarker,hitFace,highlight,drawMesh,placeOnFace,hitPolygons,drawOpen,openTransform,transformMesh,upFace,faceScreenAxes,drawArrow,cameraFrame,placeAnamorphic,facePoint};
+  const api={estimate,draw,worldCorners,vertices,faces,faceColors,faceMarker,hitFace,highlight,drawMesh,placeOnFace,hitPolygons,drawOpen,openTransform,transformMesh,upFace,frontFace,faceScreenAxes,drawArrow,cameraFrame,placeAnamorphic,facePoint};
   if(typeof module!=='undefined')module.exports=api;else root.MockARBox=api;
 })(globalThis);

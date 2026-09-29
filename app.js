@@ -24,7 +24,11 @@ const FACE_E = 4, FACE_FLOOR = 3, FACE_E_ID = MockAR.IDS[FACE_E], HOLD_MS = 300,
 const UP_SCORE = .75, UP_HOLD_MS = 400;
 // QR codes the page knows. The printed one opens this page, and is then looked for in the camera
 // as a marker of its own: seeing it turns the box red.
-const FACE_F = 5, STAGE_SPAN = .86; // the run fills most of the F face
+const FACE_B = 1, FACE_F = 5, STAGE_SPAN = .86; // the run fills most of the F face
+// Tapping B remembers where the camera is. Once it has come round to the far side of the box,
+// CL and AR appear at the sides of the screen, and the box's own E face completes the word.
+const HALF_TURN_DEG = 150, CLEAR_HOLD_MS = 500, CENTRED = .16, FACING = .8;
+let halfTurn = null, centredSince = 0, cleared = false;
 let runner = null, runnerTime = 0;
 
 const QR_CODES = { 'https://taiga39.github.io/ARMock/': 'ARMockカード' };
@@ -35,11 +39,38 @@ const HOLOGRAM_HEIGHT = 1;
 // The second switch stands on the floor inside the box (the inner side of FACE_D), seen through the opening.
 const insideMesh = MockARBox.placeOnFace(MockARSwitch, FACE_FLOOR, .55, [1], 0, true);
 const insidePressedMesh = MockARBox.placeOnFace(MockARSwitch, FACE_FLOOR, .55, [1], .1, true);
+// The angle the camera has travelled around the box since B was tapped.
+function turnedDegrees(pose) {
+  const frame = halfTurn && MockARBox.cameraFrame(pose);
+  if (!frame) return 0;
+  const length = Math.hypot(...frame.center);
+  if (!(length > 1e-6)) return 0;
+  const cosine = frame.center.reduce((sum, x, i) => sum + x * halfTurn.from[i], 0) / length;
+  return Math.acos(Math.min(1, Math.max(-1, cosine))) * 180 / Math.PI;
+}
+// CL and AR sit at fixed places on screen; the box is brought between them.
+function drawWord(ctx, width, height, state) {
+  const size = Math.round(width * .15), gap = width * .29;
+  ctx.save();
+  ctx.font = `bold ${size}px system-ui,sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = Math.max(3, size * .08); ctx.strokeStyle = '#00000088';
+  ctx.fillStyle = state === 'cleared' ? '#e8b23a' : '#ffffff';
+  for (const [text, x] of [['CL', width / 2 - gap], ['AR', width / 2 + gap]]) {
+    ctx.strokeText(text, x, height / 2); ctx.fillText(text, x, height / 2);
+  }
+  if (state === 'cleared') {
+    ctx.font = `bold ${Math.round(size * .7)}px system-ui,sans-serif`;
+    ctx.fillStyle = '#e8b23a'; ctx.strokeText('CLEAR', width / 2, height * .16);
+    ctx.fillText('CLEAR', width / 2, height * .16);
+  }
+  ctx.restore();
+}
 function resetPuzzle() {
   stage = 'switch'; upFace = -1; upCandidate = -1;
   openTarget = 0; openProgress = 0; insidePolygons = null;
   counts.fill(0); for (const k of Object.keys(faceColorOverride)) delete faceColorOverride[k];
-  runner = null;
+  runner = null; halfTurn = null; cleared = false; centredSince = 0;
 }
 // A face counts as up only after UP_HOLD_MS, so faces passed while turning are not taken as answers.
 function trackUpFace(rotation, now) {
@@ -187,17 +218,39 @@ function tick(now) {
             if (runner.done) runner = null;
           }
         }
+        // Half a turn around the box, then the E face between CL and AR spells the word.
+        if (halfTurn) {
+          if (!halfTurn.turned && turnedDegrees(pose) >= HALF_TURN_DEG) {
+            halfTurn.turned = true;
+            if (navigator.vibrate) navigator.vibrate([30, 40, 30, 40, 60]);
+          }
+          if (halfTurn.turned) {
+            const front = MockARBox.frontFace(pose.rotation), middle = pose.project([0, 0, 0]);
+            const offset = middle ? Math.hypot(middle.x - canvas.width / 2, middle.y - canvas.height / 2) : Infinity;
+            const inPlace = front.face === FACE_E && front.score > FACING && offset < canvas.width * CENTRED;
+            if (!inPlace) centredSince = 0;
+            else if (!centredSince) centredSince = now;
+            else if (now - centredSince >= CLEAR_HOLD_MS && !cleared) {
+              cleared = true;
+              if (navigator.vibrate) navigator.vibrate([60, 50, 160]);
+            }
+            options.gold = cleared;
+          }
+        }
         // The letters float above the box and turn with it; only its heading is left to match.
         if (stage === 'hologram') {
           const placed = MockARBox.placeAnamorphic(MockARAnamorphic, pose, { height: HOLOGRAM_HEIGHT });
           if (placed) MockARBox.drawMesh(ctx, pose, placed, 1);
         }
+        if (halfTurn && halfTurn.turned) drawWord(ctx, canvas.width, canvas.height, cleared ? 'cleared' : 'waiting');
         lastPose = pose;
         if (touched && now < touched.until) MockARBox.highlight(ctx, pose, touched.face);
         $('pose-state').textContent = pose.mode === 'multi' ? `位置推定: ${pose.count}面で箱全体を追跡（ずれ ${pose.error.toFixed(1)}px）` :
           `位置推定: 1面から推定（${calibratedFocal() ? '画角は自動測定済み' : '画角は手動値'}${pose.mode === 'single-tracked' ? '・直前の向きを使用' : ''}）`;
         if (lidShown) $('pose-state').textContent += openProgress > .001 ? ' / Eの面が開いています' : ' / Eは矢印の向きにスワイプ';
         $('up-face').textContent = upFace < 0 ? '—' : 'FACE_' + 'ABCDEF'[upFace];
+        if (halfTurn) $('pose-state').textContent += cleared ? ' / CLEAR' :
+          halfTurn.turned ? ' / 箱を真ん中へ' : ` / 半周したか: ${turnedDegrees(pose).toFixed(0)}度`;
         $('puzzle-state').textContent = runner ? (runner.blocked ? '壁にぶつかった。箱を回してみる' : 'Fの面を走っている')
           : { switch: 'Eの面を矢印の向きにスワイプ', inside: '中のスイッチを押す',
             hologram: '箱を横に回して、文字がそろう向きを探す' }[stage];
@@ -291,6 +344,16 @@ function endGesture(event) {
   clearTimeout(gesture.timer);
   const face = gesture.face, wasDragging = dragging;
   if (!gesture.handled && !gesture.moved) {
+    if (face === FACE_B && lastPose) {
+      const frame = MockARBox.cameraFrame(lastPose), length = frame && Math.hypot(...frame.center);
+      if (length > 1e-6) {
+        halfTurn = { from: frame.center.map(x => x / length), turned: false };
+        cleared = false; centredSince = 0;
+        if (navigator.vibrate) navigator.vibrate(40);
+        say('Bの面を押した', objectColors[FACE_B]);
+        endGestureCleanup(event); return;
+      }
+    }
     counts[face]++;
     touched = { face, until: performance.now() + 600 };
     if (navigator.vibrate) navigator.vibrate(30);
@@ -301,6 +364,9 @@ function endGesture(event) {
     if (navigator.vibrate) navigator.vibrate(40);
     say(openTarget ? 'スワイプ: Eの面が開きます' : 'スワイプ: Eの面が閉じます', '#ff5268');
   }
+  endGestureCleanup(event);
+}
+function endGestureCleanup(event) {
   dragging = false; gesture = null;
   if (event && canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
 }
