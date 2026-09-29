@@ -29,6 +29,21 @@ const FACE_B = 1, FACE_F = 5, STAGE_SPAN = .86; // the run fills most of the F f
 // CL and AR appear at the sides of the screen, and the box's own E face completes the word.
 const HALF_TURN_DEG = 150, CLEAR_HOLD_MS = 500, CENTRED = .16, FACING = .8;
 let halfTurn = null, centredSince = 0, cleared = false;
+// The half turn is meant to be the player walking round, not the box being turned, so it is read
+// from the phone's own heading. Where no heading is available it falls back to the angle between
+// the box and the camera, which cannot tell the two apart.
+let heading = null;
+const headingOf = event => typeof event.webkitCompassHeading === 'number' ? event.webkitCompassHeading
+  : (event.absolute || event.type === 'deviceorientationabsolute') && typeof event.alpha === 'number' ? 360 - event.alpha : null;
+function onHeading(event) { const value = headingOf(event); if (value !== null) heading = value; }
+for (const type of ['deviceorientationabsolute', 'deviceorientation']) window.addEventListener(type, onHeading);
+async function askForHeading() {
+  // iOS only hands out the heading after an explicit request from a tap.
+  const ask = window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission;
+  if (typeof ask !== 'function') return;
+  try { await DeviceOrientationEvent.requestPermission(); } catch (error) { /* keep the fallback */ }
+}
+const headingGap = (a, b) => { const d = Math.abs((a - b) % 360); return d > 180 ? 360 - d : d; };
 let runner = null, runnerTime = 0;
 
 const QR_CODES = { 'https://taiga39.github.io/ARMock/': 'ARMockカード' };
@@ -39,12 +54,15 @@ const HOLOGRAM_HEIGHT = 1;
 // The second switch stands on the floor inside the box (the inner side of FACE_D), seen through the opening.
 const insideMesh = MockARBox.placeOnFace(MockARSwitch, FACE_FLOOR, .55, [1], 0, true);
 const insidePressedMesh = MockARBox.placeOnFace(MockARSwitch, FACE_FLOOR, .55, [1], .1, true);
-// The angle the camera has travelled around the box since B was tapped.
+// How far the player has come round since B was tapped: by the phone's heading when there is one,
+// otherwise by how far the camera has moved around the box.
 function turnedDegrees(pose) {
-  const frame = halfTurn && MockARBox.cameraFrame(pose);
-  if (!frame) return 0;
+  if (!halfTurn) return 0;
+  if (halfTurn.heading !== null && heading !== null) return headingGap(heading, halfTurn.heading);
+  const frame = halfTurn.from && pose && MockARBox.cameraFrame(pose);
+  if (!frame) return halfTurn.best || 0;
   const length = Math.hypot(...frame.center);
-  if (!(length > 1e-6)) return 0;
+  if (!(length > 1e-6)) return halfTurn.best || 0;
   const cosine = frame.center.reduce((sum, x, i) => sum + x * halfTurn.from[i], 0) / length;
   return Math.acos(Math.min(1, Math.max(-1, cosine))) * 180 / Math.PI;
 }
@@ -64,6 +82,20 @@ function drawWord(ctx, width, height, state) {
     ctx.fillStyle = '#e8b23a'; ctx.strokeText('CLEAR', width / 2, height * .16);
     ctx.fillText('CLEAR', width / 2, height * .16);
   }
+  ctx.restore();
+}
+// How far round the player has come, drawn on the video itself so it can be read while moving.
+function drawTurnProgress(ctx, width, height, degrees, source) {
+  const size = Math.max(14, Math.round(width * .045));
+  ctx.save();
+  ctx.font = `bold ${size}px system-ui,sans-serif`;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.lineWidth = Math.max(3, size * .3); ctx.strokeStyle = '#000000aa';
+  const text = `${Math.round(degrees)}° / ${HALF_TURN_DEG}°${source === 'box' ? '（箱基準）' : ''}`;
+  ctx.strokeText(text, size * .6, size * .6); ctx.fillStyle = '#ffdb54'; ctx.fillText(text, size * .6, size * .6);
+  const full = width - size * 1.2, done = full * Math.min(1, degrees / HALF_TURN_DEG);
+  ctx.fillStyle = '#00000077'; ctx.fillRect(size * .6, size * 2, full, size * .35);
+  ctx.fillStyle = '#ffdb54'; ctx.fillRect(size * .6, size * 2, done, size * .35);
   ctx.restore();
 }
 function resetPuzzle() {
@@ -220,6 +252,7 @@ function tick(now) {
         }
         // Half a turn around the box, then the E face between CL and AR spells the word.
         if (halfTurn) {
+          halfTurn.best = Math.max(halfTurn.best || 0, turnedDegrees(pose));
           if (!halfTurn.turned && turnedDegrees(pose) >= HALF_TURN_DEG) {
             halfTurn.turned = true;
             if (navigator.vibrate) navigator.vibrate([30, 40, 30, 40, 60]);
@@ -249,7 +282,8 @@ function tick(now) {
         if (lidShown) $('pose-state').textContent += openProgress > .001 ? ' / Eの面が開いています' : ' / Eは矢印の向きにスワイプ';
         $('up-face').textContent = upFace < 0 ? '—' : 'FACE_' + 'ABCDEF'[upFace];
         if (halfTurn) $('pose-state').textContent += cleared ? ' / CLEAR' :
-          halfTurn.turned ? ' / 箱を真ん中へ' : ` / 半周したか: ${turnedDegrees(pose).toFixed(0)}度`;
+          halfTurn.turned ? ' / 箱を真ん中へ' :
+          ` / 半周したか: ${turnedDegrees(pose).toFixed(0)}度（${halfTurn.heading !== null && heading !== null ? 'スマホの向き' : '箱との相対角'}）`;
         $('puzzle-state').textContent = runner ? (runner.blocked ? '壁にぶつかった。箱を回してみる' : 'Fの面を走っている')
           : { switch: 'Eの面を矢印の向きにスワイプ', inside: '中のスイッチを押す',
             hologram: '箱を横に回して、文字がそろう向きを探す' }[stage];
@@ -259,6 +293,8 @@ function tick(now) {
   // CL and AR belong to the screen, not to the box, so they stay put even on frames where the
   // box is not recognised - otherwise they flicker while you walk around it.
   if (halfTurn && halfTurn.turned) drawWord(ctx, canvas.width, canvas.height, cleared ? 'cleared' : 'waiting');
+  else if (halfTurn) drawTurnProgress(ctx, canvas.width, canvas.height, turnedDegrees(lastPose),
+    halfTurn.heading !== null && heading !== null ? 'phone' : 'box');
   render(marker, angle, elapsed);
 }
 function stop() {
@@ -277,6 +313,7 @@ $('start').onclick = async () => {
     return;
   }
   starting = true; $('start').disabled = true;
+  await askForHeading();
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
     video.srcObject = stream; await video.play();
@@ -349,7 +386,7 @@ function endGesture(event) {
     if (face === FACE_B && lastPose) {
       const frame = MockARBox.cameraFrame(lastPose), length = frame && Math.hypot(...frame.center);
       if (length > 1e-6) {
-        halfTurn = { from: frame.center.map(x => x / length), turned: false };
+        halfTurn = { from: frame.center.map(x => x / length), heading, turned: false };
         cleared = false; centredSince = 0;
         if (navigator.vibrate) navigator.vibrate(40);
         say('Bの面を押した', objectColors[FACE_B]);
