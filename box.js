@@ -188,6 +188,12 @@
     ctx.strokeStyle='#00000066';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();
     return true;
   }
+  // A point on face k: a along the face's right, b along its up, both in [-.5,.5], lifted off the
+  // surface by `lift` so an overlay drawn on the face does not fight with the face itself.
+  function facePoint(k,a,b,lift=0) {
+    const [n,r,u]=bases[k];
+    return [0,1,2].map(i=>n[i]*(.5+lift)+a*r[i]+b*u[i]);
+  }
   // Where the camera is, in box coordinates. P = K[R|T]/T2 with K = diag(f,f,1), so the rows give
   // back T and the focal length, and the camera sits at -R' T. 'up' is the phone's own up direction.
   function cameraFrame(pose) {
@@ -361,6 +367,6 @@
     }
     ctx.restore();
   }
-  const api={estimate,draw,worldCorners,vertices,faces,faceColors,faceMarker,hitFace,highlight,drawMesh,placeOnFace,hitPolygons,drawOpen,openTransform,transformMesh,upFace,faceScreenAxes,drawArrow,cameraFrame,placeAnamorphic};
+  const api={estimate,draw,worldCorners,vertices,faces,faceColors,faceMarker,hitFace,highlight,drawMesh,placeOnFace,hitPolygons,drawOpen,openTransform,transformMesh,upFace,faceScreenAxes,drawArrow,cameraFrame,placeAnamorphic,facePoint};
   if(typeof module!=='undefined')module.exports=api;else root.MockARBox=api;
 })(globalThis);

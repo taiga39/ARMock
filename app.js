@@ -24,6 +24,9 @@ const FACE_E = 4, FACE_FLOOR = 3, FACE_E_ID = MockAR.IDS[FACE_E], HOLD_MS = 300,
 const UP_SCORE = .75, UP_HOLD_MS = 400;
 // QR codes the page knows. The printed one opens this page, and is then looked for in the camera
 // as a marker of its own: seeing it turns the box red.
+const FACE_F = 5, STAGE_SPAN = .86; // the run fills most of the F face
+let runner = null, runnerTime = 0;
+
 const QR_CODES = { 'https://taiga39.github.io/ARMock/': 'ARMockカード' };
 const QR_EVERY = 2, QR_HOLD_MS = 700, QR_RED = '#ff2d2d';
 let qrText = null, qrUntil = 0, qrCorners = null, qrTick = 0;
@@ -36,6 +39,7 @@ function resetPuzzle() {
   stage = 'switch'; upFace = -1; upCandidate = -1;
   openTarget = 0; openProgress = 0; insidePolygons = null;
   counts.fill(0); for (const k of Object.keys(faceColorOverride)) delete faceColorOverride[k];
+  runner = null;
 }
 // A face counts as up only after UP_HOLD_MS, so faces passed while turning are not taken as answers.
 function trackUpFace(rotation, now) {
@@ -165,6 +169,24 @@ function tick(now) {
         if (lidShown && openProgress < .99)
           MockARBox.drawArrow(ctx, pose, FACE_E, 0, -1, { opacity: (1 - openProgress) * .9,
             transform: MockARBox.openTransform(FACE_E, openProgress * OPEN_ANGLE) });
+        // The run lives on the F face. Gravity is screen-down whatever the box does, so turning the
+        // box turns the stage under the character: its wall becomes a floor.
+        if (runner) {
+          const axes = MockARBox.faceScreenAxes(pose, FACE_F);
+          if (!axes) { runner = null; }
+          else {
+            if (runner.turn === undefined) runner.turn = MockARRunner.uprightTurn(axes);
+            const { ex, ey, down, walk } = MockARRunner.frame(axes, runner.turn);
+            const seconds = Math.min(.1, (now - (runnerTime || now)) / 1000); runnerTime = now;
+            MockARRunner.update(runner, seconds, down, walk);
+            const project = (x, y) => {
+              const u = (x / MockARRunner.COLS - .5) * STAGE_SPAN, v = (y / MockARRunner.ROWS - .5) * STAGE_SPAN;
+              return pose.project(MockARBox.facePoint(FACE_F, u * ex[0] + v * ey[0], u * ex[1] + v * ey[1], .004));
+            };
+            MockARRunner.draw(ctx, project, runner);
+            if (runner.done) runner = null;
+          }
+        }
         // The letters float above the box and turn with it; only its heading is left to match.
         if (stage === 'hologram') {
           const placed = MockARBox.placeAnamorphic(MockARAnamorphic, pose, { height: HOLOGRAM_HEIGHT });
@@ -176,8 +198,9 @@ function tick(now) {
           `位置推定: 1面から推定（${calibratedFocal() ? '画角は自動測定済み' : '画角は手動値'}${pose.mode === 'single-tracked' ? '・直前の向きを使用' : ''}）`;
         if (lidShown) $('pose-state').textContent += openProgress > .001 ? ' / Eの面が開いています' : ' / Eは矢印の向きにスワイプ';
         $('up-face').textContent = upFace < 0 ? '—' : 'FACE_' + 'ABCDEF'[upFace];
-        $('puzzle-state').textContent = { switch: 'Eの面を矢印の向きにスワイプ', inside: '中のスイッチを押す',
-          hologram: '箱を横に回して、文字がそろう向きを探す' }[stage];
+        $('puzzle-state').textContent = runner ? (runner.blocked ? '壁にぶつかった。箱を回してみる' : 'Fの面を走っている')
+          : { switch: 'Eの面を矢印の向きにスワイプ', inside: '中のスイッチを押す',
+            hologram: '箱を横に回して、文字がそろう向きを探す' }[stage];
       } else $('pose-state').textContent = '位置推定: 箱の全体をもう少し大きく映してください';
     }
   }
@@ -236,6 +259,13 @@ canvas.addEventListener('pointerdown', event => {
     axes: MockARBox.faceScreenAxes(lastPose, face), timer: 0 };
   gesture.timer = setTimeout(() => {
     if (!gesture || gesture.moved) return;
+    // Long press on FACE_F starts the run on that face; the other faces keep changing colour.
+    if (face === FACE_F) {
+      runner = MockARRunner.create(); runnerTime = 0; gesture.handled = true;
+      if (navigator.vibrate) navigator.vibrate([30, 50, 30]);
+      say('Fの面: 走り出しました', '#ff5268');
+      return;
+    }
     const next = (PALETTE.indexOf(faceColorOverride[face]) + 1) % PALETTE.length;
     faceColorOverride[face] = PALETTE[next];
     gesture.handled = true;
