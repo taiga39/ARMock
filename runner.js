@@ -20,6 +20,8 @@
     '##########'
   ];
   const WALK = 3.2, FALL = 7, HOP = 5.2, SIZE = .7; // cells per second, and the character's size
+  // The page can tune the speeds; without config.js (in the tests) the numbers above stand.
+  const tuned = (key, fallback) => (root.MockARConfig && root.MockARConfig.values[key]) || fallback;
   const solid = (x, y) => {
     const col = Math.floor(x), row = Math.floor(y);
     if (col < 0 || row < 0 || col >= COLS || row >= ROWS) return false; // outside the stage is open air
@@ -54,11 +56,11 @@
       move(-down.x, -down.y, HOP * seconds);
     } else if (!standing) {
       state.fall += seconds;
-      move(down.x, down.y, FALL * seconds);
+      move(down.x, down.y, tuned('runFall', FALL) * seconds);
     } else state.fall = 0;
     // Walking, with a hop over anything one cell high.
-    const walked = move(walk.x, walk.y, WALK * seconds);
-    if (walked < WALK * seconds * .5 && standing && state.hop <= 0) {
+    const speed = tuned('runWalk', WALK), walked = move(walk.x, walk.y, speed * seconds);
+    if (walked < speed * seconds * .5 && standing && state.hop <= 0) {
       const overhead = 1.1;
       const free = !blocked(state.x - down.x * overhead, state.y - down.y * overhead, walk.x, walk.y);
       if (free) state.hop = .22; // a low obstacle: jump it
