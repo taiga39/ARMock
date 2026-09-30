@@ -188,6 +188,28 @@
     ctx.strokeStyle='#00000066';ctx.lineWidth=1.5;ctx.stroke();ctx.restore();
     return true;
   }
+  // A pose for a camera placed by hand, with no image behind it: the preview page and the tests use
+  // it to see the box from a chosen angle. yaw 0 looks at FACE_A, and roll turns the camera itself.
+  function poseFromCamera(options={}) {
+    const {yaw=0,pitch=0,roll=0,distance=6,focal=.8,width=640,height=480}=options;
+    const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+    const center=[-sy*cp*distance,sp*distance,-cy*cp*distance];      // where the camera stands
+    const forward=unit(center.map(x=>-x));                            // it looks back at the box
+    let right=unit(cross([0,1,0],forward)),down=cross(forward,right);
+    // Box coordinates are left-handed, so the camera's rows have det -1; flip if they came out +1.
+    const det=right[0]*(down[1]*forward[2]-down[2]*forward[1])-right[1]*(down[0]*forward[2]-down[2]*forward[0])
+      +right[2]*(down[0]*forward[1]-down[1]*forward[0]);
+    if(det>0){right=right.map(x=>-x);down=cross(forward,right);}
+    const cr=Math.cos(roll),sr=Math.sin(roll);
+    const R=[right.map((x,i)=>x*cr+down[i]*sr),right.map((x,i)=>-x*sr+down[i]*cr),forward];
+    const T=R.map(row=>-dot(row,center));
+    if(!(T[2]>1e-6)) return null;
+    const P=R.map((row,i)=>[...row,T[i]].map(x=>(i<2?focal*x:x)/T[2]));
+    const scale=Math.max(width,height),project=projector(P,width,height,scale);
+    const points=vertices.map(project);
+    if(points.some(p=>!p)) return null;
+    return {points,project,mode:'preview',error:0,count:3,matrix:P,focal,rotation:R};
+  }
   // A point on face k: a along the face's right, b along its up, both in [-.5,.5], lifted off the
   // surface by `lift` so an overlay drawn on the face does not fight with the face itself.
   function facePoint(k,a,b,lift=0) {
@@ -373,6 +395,6 @@
     }
     ctx.restore();
   }
-  const api={estimate,draw,worldCorners,vertices,faces,faceColors,faceMarker,hitFace,highlight,drawMesh,placeOnFace,hitPolygons,drawOpen,openTransform,transformMesh,upFace,frontFace,faceScreenAxes,drawArrow,cameraFrame,placeAnamorphic,facePoint};
+  const api={estimate,draw,worldCorners,vertices,faces,faceColors,faceMarker,hitFace,highlight,drawMesh,placeOnFace,hitPolygons,drawOpen,openTransform,transformMesh,upFace,frontFace,faceScreenAxes,drawArrow,cameraFrame,placeAnamorphic,facePoint,poseFromCamera};
   if(typeof module!=='undefined')module.exports=api;else root.MockARBox=api;
 })(globalThis);
