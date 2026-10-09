@@ -195,15 +195,15 @@
     const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
     const center=[-sy*cp*distance,sp*distance,-cy*cp*distance];      // where the camera stands
     const forward=unit(center.map(x=>-x));                            // it looks back at the box
-    let right=unit(cross([0,1,0],forward)),down=cross(forward,right);
-    // Box coordinates are left-handed, so the camera's rows have det -1; flip if they came out +1.
-    const det=right[0]*(down[1]*forward[2]-down[2]*forward[1])-right[1]*(down[0]*forward[2]-down[2]*forward[0])
-      +right[2]*(down[0]*forward[1]-down[1]*forward[0]);
-    if(det>0){right=right.map(x=>-x);down=cross(forward,right);}
+    // Box coordinates are left-handed, so the camera's rows have det -1, as estimate() gives them;
+    // with det +1 the preview would show the box mirrored.
+    const right=unit(cross([0,1,0],forward)),down=cross(right,forward);
     const cr=Math.cos(roll),sr=Math.sin(roll);
-    const R=[right.map((x,i)=>x*cr+down[i]*sr),right.map((x,i)=>-x*sr+down[i]*cr),forward];
-    const T=R.map(row=>-dot(row,center));
+    const view=[right.map((x,i)=>x*cr+down[i]*sr),right.map((x,i)=>-x*sr+down[i]*cr),forward];
+    const T=view.map(row=>-dot(row,center));
     if(!(T[2]>1e-6)) return null;
+    // options.box (rows of a rotation) turns the box about its centre, in front of the same camera.
+    const R=options.box?view.map(row=>[0,1,2].map(j=>row.reduce((s,x,k)=>s+x*options.box[k][j],0))):view;
     const P=R.map((row,i)=>[...row,T[i]].map(x=>(i<2?focal*x:x)/T[2]));
     const scale=Math.max(width,height),project=projector(P,width,height,scale);
     const points=vertices.map(project);
@@ -286,7 +286,8 @@
   }
   // Draws a mesh in box coordinates: back faces culled, far polygons first (d grows with depth).
   // Light is fixed to the box, so shading turns with it.
-  function drawMesh(ctx,pose,mesh,opacity) {
+  // camera (box coordinates) switches to the Unity sequence shading: brighter the more a polygon faces it.
+  function drawMesh(ctx,pose,mesh,opacity,camera=null) {
     const light=[.35,.8,-.5],norm=Math.hypot(...light),points=mesh.vertices.map(pose.project);
     if(points.some(p=>!p))return false;
     const list=[];
@@ -296,7 +297,8 @@
       if(area<=0)return;
       const [a,b,c]=poly.map(v=>mesh.vertices[v]),u=b.map((x,k)=>x-a[k]),w=c.map((x,k)=>x-a[k]);
       const n=[u[1]*w[2]-u[2]*w[1],u[2]*w[0]-u[0]*w[2],u[0]*w[1]-u[1]*w[0]],len=Math.hypot(...n)||1;
-      const shade=.55+.6*Math.max(0,dot(n,light)/len/norm);
+      const toward=camera&&unit(camera.map((x,k)=>x-a[k]));
+      const shade=toward?.45+.55*Math.abs(dot(n,toward)/len):.55+.6*Math.max(0,dot(n,light)/len/norm);
       list.push({pts,layer:mesh.layers?.[mesh.parts[poly[0]]]??0,depth:pts.reduce((s,p)=>s+p.d,0)/pts.length,
         color:mesh.colors[mesh.materials[i]].map(x=>Math.min(255,Math.round(x*shade)))});
     });

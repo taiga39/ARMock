@@ -9,8 +9,8 @@
 //   drawOverlay(frame, options)  draw things attached to the box, after it
 //   drawScreen(frame)            draw things fixed to the screen, even with no pose
 //   hit(frame, x, y)             claim a press on an object of its own; return true if claimed
-//   tap/longPress(frame, face)   claim a gesture on a face; return true if claimed
-//   drag/release(frame, info)    claim a swipe on a face
+//   tap/longPress(frame, face, point)  claim a gesture on a face; return true if claimed
+//   drag/release(frame, info)    claim a swipe on a face; info has face, x, y (where the finger went down), dx, dy
 //   status(frame)                one line about what the player should do
 //   jumps                        [{ label, go(frame) }] for the tuning panel, to skip ahead
 (function (root) {
@@ -298,10 +298,13 @@
     }
   };
 
+  // ?mode=sequence swaps all of the above for the white box sequence (sequence-scene.js).
+  const mode = root.location && root.MockARSequenceScene
+    && new URLSearchParams(root.location.search).get('mode') === 'sequence' ? 'sequence' : 'demo';
   // Order matters: a gesture goes to the first module that claims it, and the faces take what is left.
-  const list = [qr, lid, hologram, run, word, faces];
+  const list = mode === 'sequence' ? [root.MockARSequenceScene] : [qr, lid, hologram, run, word, faces];
   const api = {
-    list, FACE, heading: null,
+    list, FACE, mode, heading: null, tilt: null,
     get: id => list.find(scene => scene.id === id),
     reset: () => list.forEach(scene => scene.reset && scene.reset()),
     // Ask each module in turn; the first one to claim the gesture wins.
@@ -325,7 +328,7 @@
     },
     // Whatever the player is in the middle of speaks first.
     status(frame) {
-      for (const scene of [word, run, hologram, lid, faces]) {
+      for (const scene of mode === 'sequence' ? list : [word, run, hologram, lid, faces]) {
         const text = scene.status && scene.status(frame);
         if (text) return text;
       }

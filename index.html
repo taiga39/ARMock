@@ -2,7 +2,9 @@
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MockAR 認識テスト</title><link rel="stylesheet" href="style.css"></head>
 <body><main><h1>MockAR <small>認識テスト</small></h1>
-<p>A → C → F → 時計回り90°</p>
+<p class="demo-only">A → C → F → 時計回り90°</p>
+<label class="mode">モード <select id="mode"><option value="demo">いろいろな仕掛け（デモ）</option><option value="sequence">白い箱の謎（スタート → パズル → スート → 時計）</option></select></label>
+<p class="sequence-only">白い箱の謎: 面をタップして進める。時計は正面を上下にスワイプ。◆は箱そのものを45°回してタップ（スマホを傾けても数えません）。</p>
 <div class="controls"><button id="start">背面カメラ開始</button><button id="stop" disabled>停止</button><button id="reset">履歴リセット</button></div>
 <p id="message" role="status">PCと同じWi-Fiで接続してください。</p>
 <video id="video" playsinline muted hidden></video><canvas id="preview"></canvas>
@@ -11,9 +13,9 @@
 <label>表示 <select id="object-mode"><option value="color">面ごとに色分け</option><option value="black">箱全体を黒く</option><option value="box">別の青い箱</option><option value="ball">色つきの球（前のデモ）</option></select></label>
 <p id="object-state">箱のマーカーを映してください。</p>
 <p id="pose-state">位置推定: 待機中</p>
-<p>タップ=その面の数字+1 / 長押し=色を変える（Fの面は走り出す） / Eの面は矢印の向きにスワイプで開く → <b id="touched">—</b></p>
+<p><span class="demo-only">タップ=その面の数字+1 / 長押し=色を変える（Fの面は走り出す） / Eの面は矢印の向きにスワイプで開く → </span><b id="touched">—</b></p>
 <p>上になっている面: <b id="up-face">—</b> / 手順: <b id="puzzle-state">Eのスイッチを押す</b></p>
-<p>スマホは固定してください。画面の上方向を「上」として判定します。</p>
+<p class="demo-only">スマホは固定してください。画面の上方向を「上」として判定します。</p>
 <label>不透明度 <input id="box-opacity" type="range" min="0.2" max="1" step="0.05" value="1"></label>
 <details><summary>1面だけのときの位置合わせ</summary><label>カメラ画角 <input id="camera-fov" type="range" min="35" max="100" value="60"> <output id="fov-value">60°</output></label><p>一度2面以上を映すと画角を自動で測り、このスライダーは使われなくなります（再読み込みでリセット）。1面だけのときは直前の箱の向きも使って傾きを判断するので、2面以上見える状態から回していくと安定します。</p></details>
 <p>Unityの <b>Oblique view</b> で上面・側面も映せます。<b>Front view</b> で正面に戻ります。</p></section>
@@ -28,4 +30,4 @@
 <button id="export">記録をJSONで保存</button></details>
 <p><a href="markers.html">6面のマーカーを確認</a> / <a href="print.html">キューブの展開図（印刷用）</a> / <a href="preview.html">カメラなしのプレビュー</a> / <a href="?tune=1">調整パネル付きで開く</a></p>
 <p class="credit">認識ライブラリ: <a href="https://github.com/jcmellado/js-aruco">js-aruco</a>（MIT） / QR読み取り: <a href="https://github.com/cozmo/jsQR">jsQR</a>（Apache-2.0） / スイッチの3Dモデル: Button Switch by Zoe XR / 浮かぶ文字: anamorphic_QR</p>
-</main><script src="vendor/cv.js"></script><script src="vendor/aruco.js"></script><script src="vendor/jsQR.js"></script><script src="tracker.js"></script><script src="config.js"></script><script src="box.js"></script><script src="switch.js"></script><script src="anamorphic.js"></script><script src="runner.js"></script><script src="scenes.js"></script><script src="tune.js"></script><script src="app.js"></script></body></html>
+</main><script src="vendor/cv.js"></script><script src="vendor/aruco.js"></script><script src="vendor/jsQR.js"></script><script src="tracker.js"></script><script src="config.js"></script><script src="box.js"></script><script src="switch.js"></script><script src="anamorphic.js"></script><script src="runner.js"></script><script src="sequence.js"></script><script src="sequence-scene.js"></script><script src="scenes.js"></script><script src="tune.js"></script><script src="app.js"></script></body></html>

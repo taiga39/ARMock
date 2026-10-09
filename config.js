@@ -27,7 +27,20 @@
     { key: 'clearFacing', label: 'E面が正面と認める度合い', value: .8, min: .3, max: .99, step: .01, group: 'CLEAR' },
 
     { key: 'qrEvery', label: 'QRを読む間隔（フレームに1回）', value: 2, min: 1, max: 10, step: 1, group: 'QR' },
-    { key: 'qrHoldMs', label: 'QRを見失っても保持する時間', value: 700, min: 100, max: 3000, step: 100, unit: 'ms', group: 'QR' }
+    { key: 'qrHoldMs', label: 'QRを見失っても保持する時間', value: 700, min: 100, max: 3000, step: 100, unit: 'ms', group: 'QR' },
+
+    // The white box sequence (sequence.js). Its lid shares lidOpenMs and lidOpenDeg above.
+    { key: 'seamTouch', label: '境目のタッチ幅（面の幅の何割、左右それぞれ）', value: .1, min: .02, max: .3, step: .01, group: '白い箱の謎' },
+    { key: 'faceVisibleDeg', label: '面が見えていると認める角度（法線とカメラ方向）', value: 75, min: 30, max: 89, step: 1, unit: '°', group: '白い箱の謎' },
+    { key: 'diamondDeg', label: 'ひし形と認める箱の傾き', value: 45, min: 10, max: 80, step: 1, unit: '°', group: '白い箱の謎' },
+    { key: 'diamondToleranceDeg', label: 'ひし形の許容（±）', value: 7.5, min: 1, max: 20, step: .5, unit: '°', group: '白い箱の謎' },
+    { key: 'sunMoveMs', label: '太陽が次の時刻へ動く時間', value: 300, min: 50, max: 2000, step: 50, unit: 'ms', group: '白い箱の謎' },
+    { key: 'hourMin', label: '時計の最小', value: 0, min: 0, max: 23, step: 1, unit: '時', group: '白い箱の謎' },
+    { key: 'hourMax', label: '時計の最大', value: 23, min: 0, max: 23, step: 1, unit: '時', group: '白い箱の謎' },
+    { key: 'eastIsLeft', label: '東を左にする（1=左、0=右）', value: 1, min: 0, max: 1, step: 1, group: '白い箱の謎' },
+    { key: 'boxHologramHeight', label: '中の文字の高さ（箱の中心から）', value: 0, min: -.5, max: 1, step: .05, group: '白い箱の謎' },
+    { key: 'hologramDesignDistance', label: '中の文字がそろう距離（モデルの設計値）', value: 3.5, min: 1, max: 10, step: .1, group: '白い箱の謎' },
+    { key: 'hologramSize', label: '中の文字の大きさ', value: .5, min: .1, max: 1.5, step: .05, group: '白い箱の謎' }
   ];
   const STORE = 'mockar.config';
   const defaults = () => Object.fromEntries(SCHEMA.map(item => [item.key, item.value]));

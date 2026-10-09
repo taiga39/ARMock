@@ -3,9 +3,10 @@
 <title>MockAR プレビュー</title><link rel="stylesheet" href="style.css"></head>
 <body><main><h1>MockAR <small>プレビュー</small></h1>
 <p>カメラも印刷物も使わずに、各画面の見え方を確認できます。描画は本番と同じコードです。</p>
+<label class="mode">モード <select id="mode"><option value="demo">いろいろな仕掛け（デモ）</option><option value="sequence">白い箱の謎（スタート → パズル → スート → 時計）</option></select></label>
 <canvas id="stage" width="640" height="480"></canvas>
 <p id="state">—</p>
-<p>箱をクリック＝タップ / Shift+クリック＝長押し → <b id="said">—</b></p>
+<p>箱をクリック＝タップ / ドラッグ＝スワイプ / Shift+クリック＝長押し → <b id="said">—</b></p>
 <section>
 <h2>カメラ</h2>
 <div class="tune-row">
@@ -15,6 +16,8 @@
 <label class="tune-item"><span>横の角度 <output id="yaw-value">20°</output></span><input id="yaw" type="range" min="0" max="360" step="1" data-unit="°"></label>
 <label class="tune-item"><span>上下の角度 <output id="pitch-value">15°</output></span><input id="pitch" type="range" min="-80" max="80" step="1" data-unit="°"></label>
 <label class="tune-item"><span>カメラの傾き <output id="roll-value">0°</output></span><input id="roll" type="range" min="-180" max="180" step="1" data-unit="°"></label>
+<label class="tune-item sequence-only"><span>箱の傾き（視線のまわり） <output id="boxroll-value">0°</output></span><input id="boxroll" type="range" min="-180" max="180" step="1" data-unit="°"></label>
+<label class="sequence-only"><input type="checkbox" id="sensor" checked> スマホの傾きセンサーあり（外すと画面基準で◆を判定）</label>
 <label class="tune-item"><span>距離 <output id="distance-value">6</output></span><input id="distance" type="range" min="1.5" max="14" step=".1"></label>
 <label class="tune-item"><span>画角（焦点距離） <output id="focal-value">0.8</output></span><input id="focal" type="range" min=".3" max="2" step=".05"></label>
 <label class="tune-item"><span>表示</span><select id="style"><option value="color">面ごとに色分け</option><option value="black">箱全体を黒く</option><option value="box">別の青い箱</option></select></label>
@@ -25,5 +28,5 @@
 </main>
 <script src="tracker.js"></script><script src="config.js"></script><script src="box.js"></script>
 <script src="switch.js"></script><script src="anamorphic.js"></script><script src="runner.js"></script>
-<script src="scenes.js"></script><script src="tune.js"></script><script src="preview.js"></script>
+<script src="sequence.js"></script><script src="sequence-scene.js"></script><script src="scenes.js"></script><script src="tune.js"></script><script src="preview.js"></script>
 </body></html>

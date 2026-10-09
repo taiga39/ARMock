@@ -24,8 +24,16 @@ const colorNames = ['赤', '黄', '青', '緑', '紫', 'オレンジ'];
 // from the phone's own heading where there is one.
 const headingOf = event => typeof event.webkitCompassHeading === 'number' ? event.webkitCompassHeading
   : (event.absolute || event.type === 'deviceorientationabsolute') && typeof event.alpha === 'number' ? 360 - event.alpha : null;
+// The sequence's diamond also takes the phone's tilt from here, so that only the box's own roll counts.
 for (const type of ['deviceorientationabsolute', 'deviceorientation'])
-  window.addEventListener(type, event => { const value = headingOf(event); if (value !== null) scenes.heading = value; });
+  window.addEventListener(type, event => {
+    const value = headingOf(event); if (value !== null) scenes.heading = value;
+    if (typeof event.beta === 'number' && typeof event.gamma === 'number') scenes.tilt = { beta: event.beta, gamma: event.gamma };
+  });
+const screenAngle = () => {
+  const orientation = window.screen && window.screen.orientation;
+  return orientation && typeof orientation.angle === 'number' ? orientation.angle : typeof window.orientation === 'number' ? window.orientation : 0;
+};
 async function askForHeading() {
   // iOS only hands out the heading after an explicit request from a tap.
   const ask = window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission;
@@ -131,7 +139,7 @@ function tick(now) {
   const frame = lastFrame = {
     now, seconds, ctx, canvas, pose, markers, qr, say, vibrate,
     ids: markers.map(m => m.id), style: $('object-mode').value, opacity: Number($('box-opacity').value),
-    get heading() { return scenes.heading; }
+    get heading() { return scenes.heading; }, get tilt() { return scenes.tilt; }, screenAngle: screenAngle()
   };
   scenes.render(frame);
   if (marker && $('show-object').checked && $('object-mode').value === 'ball') drawObject(marker, angle);
@@ -188,7 +196,7 @@ canvas.addEventListener('pointerdown', event => {
   const face = MockARBox.hitFace(lastPose, x, y);
   if (face < 0) return;
   canvas.setPointerCapture(event.pointerId);
-  gesture = { face, x, y, moved: false, handled: false, dragging: false,
+  gesture = { face, x, y, dx: 0, dy: 0, moved: false, handled: false, dragging: false,
     axes: MockARBox.faceScreenAxes(lastPose, face), timer: 0 };
   gesture.timer = setTimeout(() => {
     if (!gesture || gesture.moved) return;
@@ -201,18 +209,19 @@ canvas.addEventListener('pointermove', event => {
   const { x, y } = canvasPoint(event), dx = x - gesture.x, dy = y - gesture.y;
   if (!gesture.moved && Math.hypot(dx, dy) < values.movePx) return;
   gesture.moved = true; clearTimeout(gesture.timer);
+  gesture.dx = dx; gesture.dy = dy;
   if (gesture.handled) return;
-  if (scenes.claim('drag', lastFrame, { face: gesture.face, dx, dy, axes: gesture.axes })) gesture.dragging = true;
+  if (scenes.claim('drag', lastFrame, { face: gesture.face, x: gesture.x, y: gesture.y, dx, dy, axes: gesture.axes })) gesture.dragging = true;
 });
 function endGesture(event) {
   if (!gesture) return;
   clearTimeout(gesture.timer);
-  const { face, handled, moved, dragging } = gesture;
+  const { face, x, y, dx, dy, handled, moved, dragging } = gesture;
   gesture = null;
   if (event && canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   if (!lastFrame) return;
-  if (dragging) scenes.claim('release', lastFrame, { face });
-  else if (!handled && !moved) scenes.claim('tap', lastFrame, face);
+  if (dragging) scenes.claim('release', lastFrame, { face, x, y, dx, dy });
+  else if (!handled && !moved) scenes.claim('tap', lastFrame, face, { x, y });
 }
 canvas.addEventListener('pointerup', endGesture);
 canvas.addEventListener('pointercancel', endGesture);
@@ -227,4 +236,12 @@ $('export').onclick = () => {
 };
 document.addEventListener('visibilitychange', () => { if (document.hidden && stream) stop(); });
 window.addEventListener('pagehide', stop);
+// scenes.js reads the mode once at load, so switching reloads the page with ?mode=.
+document.body.dataset.mode = scenes.mode;
+$('mode').value = scenes.mode;
+$('mode').onchange = () => {
+  const query = new URLSearchParams(location.search);
+  if ($('mode').value === 'sequence') query.set('mode', 'sequence'); else query.delete('mode');
+  location.search = query.toString();
+};
 if (window.MockARTune) MockARTune.attach({ frame: () => lastFrame });

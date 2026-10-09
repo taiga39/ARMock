@@ -3,3 +3,5 @@
 .tune-name{min-width:7em;color:#a9c1d6;font-size:13px}
 .tune-item{display:block;margin:6px 0;font-size:13px}.tune-item span{display:block;color:#cfe0f0}.tune-item input[type=range]{width:100%}
 .tune-note{white-space:pre-wrap;word-break:break-all;background:#101722;padding:8px;border-radius:6px;font-size:12px;min-height:1em}
+.mode{display:block;margin:10px 0;padding:10px 12px;background:#23496e;border:1px solid #6586aa;border-radius:8px;font-weight:600}.mode select{font-size:16px;margin-left:6px;max-width:100%}
+[data-mode=sequence] .demo-only,body:not([data-mode=sequence]) .sequence-only{display:none}
